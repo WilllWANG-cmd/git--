@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>像素城市求生</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" width="640" height="480"></canvas>
+    <div id="overlay">
+      <!-- 命名存档对话框 -->
+      <div id="nameDialog" class="dialog hidden">
+        <div class="dialog-title">为你的存档起个名字</div>
+        <input id="nameInput" type="text" maxlength="16" placeholder="输入存档名（可中文）" />
+        <div class="dialog-btns">
+          <button id="nameCancel" class="btn">取消</button>
+          <button id="nameOk" class="btn primary">确定</button>
+        </div>
+        <div class="dialog-hint">Enter 确定 · Esc 取消</div>
+      </div>
+
+      <!-- 加入派对对话框 -->
+      <div id="joinDialog" class="dialog hidden">
+        <div class="dialog-title">加入派对</div>
+        <input id="joinInput" type="text" maxlength="40" placeholder="输入派对码（局域网）或 地址:端口（互联网）" />
+        <div class="dialog-btns">
+          <button id="joinCancel" class="btn">取消</button>
+          <button id="joinOk" class="btn primary">加入</button>
+        </div>
+        <div class="dialog-hint">Enter 加入 · Esc 取消</div>
+      </div>
+
+      <!-- 新建派对时输入名字 -->
+      <div id="hostNameDialog" class="dialog hidden">
+        <div class="dialog-title">创建派对 — 你的名字</div>
+        <input id="hostNameInput" type="text" maxlength="12" placeholder="输入你在派对里显示的名字" />
+        <div class="dialog-btns">
+          <button id="hostNameCancel" class="btn">取消</button>
+          <button id="hostNameOk" class="btn primary">创建</button>
+        </div>
+        <div class="dialog-hint">Enter 创建 · Esc 取消</div>
+      </div>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>

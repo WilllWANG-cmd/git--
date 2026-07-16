@@ -1,0 +1,45 @@
+{
+  "name": "pixel-city-survival",
+  "version": "1.0.0",
+  "description": "像素城市求生 - 二维像素末日生存游戏",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable",
+    "dist-installer": "electron-builder --win nsis"
+  },
+  "author": "Gabrielle",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.gabrielle.pixelcity",
+    "productName": "像素城市求生",
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "像素城市求生"
+    },
+    "portable": {
+      "artifactName": "像素城市求生.exe"
+    }
+  }
+}
