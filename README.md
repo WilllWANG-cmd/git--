@@ -4,26 +4,6 @@
 
 ---
 
-## 📁 项目结构
-
-```
-像素城市求生/
-├── main.js          Electron 主进程（创建窗口）
-├── preload.js       预加载脚本
-├── party.js         派系/Party 相关逻辑
-├── package.json     项目配置 & 依赖声明 & 打包配置
-├── src/
-│   ├── game.js      游戏主逻辑（核心，10 万字级）
-│   ├── index.html   游戏页面
-│   └── style.css    样式
-└── assets/
-    └── icon.png     游戏图标
-```
-
-> ⚠️ 这个仓库**只放源码**。打包后的 `.exe` 和 Electron 运行时文件（`.pak`/`.dll`/`.dat` 等）**不进 git**，玩家通过 [GitHub Releases](../../releases) 下载 `.exe`。
-
----
-
 ## 🚀 协作者入门（从零开始，跟着做就行）
 
 ### 第 0 步：装好必要软件（只做一次）

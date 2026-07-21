@@ -21,5 +21,12 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (event, payload) => cb(payload);
     ipcRenderer.on('party:event', handler);
     return () => ipcRenderer.removeListener('party:event', handler);
+  },
+
+  // 开发者模式切换（由主进程在 F12 拦截后发送）
+  onDevToggle: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('dev:toggle', handler);
+    return () => ipcRenderer.removeListener('dev:toggle', handler);
   }
 });
