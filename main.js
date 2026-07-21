@@ -34,6 +34,16 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+
+  // 拦截 F12：阻止默认打开 DevTools，并通过 IPC 通知渲染端切换"开发者模式"
+  // 注意：before-input-event 的 preventDefault 会阻止事件派发到页面，
+  //       所以这里不能让页面自己监听 F12，而是主进程发消息过去。
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      event.preventDefault();
+      mainWindow.webContents.send('dev:toggle');
+    }
+  });
 }
 
 app.whenReady().then(() => {

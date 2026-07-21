@@ -25,6 +25,7 @@
     // 任何对话框打开时，把按键完全交给输入框
     if (anyDialogOpen()) { return; }
     if (e.code === 'F3') { party.debugHud = !party.debugHud; e.preventDefault(); return; }
+    // F12 由主进程拦截并通过 dev:toggle IPC 通知，这里不再处理
     if (!keys[e.code]) keyPressed[e.code] = true;
     keys[e.code] = true;
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
@@ -327,6 +328,7 @@
   let toast = null;     // {text, until}
   let lastTime = 0;
   let playtimeAcc = 0;
+  let devMode = false;  // 开发者模式：仅存档内（single 模式 PLAYING 中）按 F12 切换
 
   // ---------- 命名对话框 ----------
   const nameDialog = document.getElementById('nameDialog');
@@ -859,6 +861,7 @@
 
   // 新建对局
   function newGame(name) {
+    devMode = false;
     const seed = (Math.random() * 0x7fffffff) | 0;
     const city = generateCity(seed);
     const home = city.buildings.find(b => b.isHome) || city.buildings[0];
@@ -1021,6 +1024,7 @@
   async function loadGameById(id) {
     const data = await window.api.loadSave(id);
     if (!data) { toastMsg('存档损坏', 2000); return false; }
+    devMode = false;
     const city = generateCity(data.seed);
     // 还原 building 状态
     for (const bs of data.cityBuildingsState || []) {
@@ -1354,7 +1358,10 @@
 
     // 死亡判定（仅本地玩家在主机/单人下进入 DEAD）
     if (game.netMode !== 'client') {
-      if (game.player.hp <= 0) {
+      if (devMode) {
+        // 开发者模式：血量无限，不会死亡
+        game.player.hp = game.player.maxHp;
+      } else if (game.player.hp <= 0) {
         game.player.hp = 0;
         state = 'DEAD';
         game.stats.deaths = (game.stats.deaths || 0) + 1;
@@ -1513,19 +1520,21 @@
   const SHOOT_LIFE = 900;      // ms
   const SHOOT_CD = 240;        // ms
   function shootForPlayer(p, aimDx, aimDy) {
-    if ((p.ammo || 0) <= 0) {
-      if (p.isLocal !== false) {
-        if (!p._noAmmoToast || performance.now() - p._noAmmoToast > 1500) {
-          toastMsg('没有子弹了！按 K 开枪，空格挥拳', 1200);
-          p._noAmmoToast = performance.now();
+    if (!devMode || p !== game.player) {
+      if ((p.ammo || 0) <= 0) {
+        if (p.isLocal !== false) {
+          if (!p._noAmmoToast || performance.now() - p._noAmmoToast > 1500) {
+            toastMsg('没有子弹了！按 K 开枪，空格挥拳', 1200);
+            p._noAmmoToast = performance.now();
+          }
         }
+        return;
       }
-      return;
     }
     const now = performance.now();
     if (now - (p.lastShoot || 0) < SHOOT_CD) return;
     p.lastShoot = now;
-    p.ammo -= 1;
+    if (!devMode || p !== game.player) p.ammo -= 1;
     p.lastAim = { dx: aimDx, dy: aimDy };
     game.bullets.push({
       x: p.x + aimDx * 8,
@@ -1620,8 +1629,24 @@
   }
 
   function useItemForPlayer(p, type) {
-    if ((p.inv[type] || 0) <= 0) return;
     const def = ITEMS[type];
+    if (!def) return;
+    if (devMode && p === game.player) {
+      // 开发者模式：本地玩家无限使用，不消耗
+      if (def.heal > 0) {
+        if (p.hp < p.maxHp) {
+          p.hp = Math.min(p.maxHp, p.hp + def.heal);
+          if (p === game.player) toastMsg('使用 ' + def.name + ' +' + def.heal + ' HP', 1000);
+        } else if (p === game.player) {
+          toastMsg('生命已满', 800);
+        }
+      } else if (def.kind === 'ammo') {
+        p.ammo = (p.ammo || 0) + 10;
+        if (p === game.player) toastMsg('+' + def.name + ' x10', 1000);
+      }
+      return;
+    }
+    if ((p.inv[type] || 0) <= 0) return;
     if (def.heal > 0) {
       if (p.hp >= p.maxHp) {
         if (p === game.player) toastMsg('生命已满', 1000);
@@ -2205,7 +2230,14 @@
     const ammo = game.player.ammo || 0;
     ctx.fillStyle = ammo > 0 ? '#ffe070' : PAL.uiDim;
     ctx.font = 'bold 11px Consolas, monospace';
-    ctx.fillText('子弹 x' + ammo + '  [K 开枪]', 440, 14);
+    ctx.fillText(devMode ? '子弹 ∞  [K 开枪]' : ('子弹 x' + ammo + '  [K 开枪]'), 440, 14);
+
+    // 开发者模式标识（不显示按键）
+    if (devMode) {
+      ctx.fillStyle = '#ff6060';
+      ctx.font = 'bold 10px Consolas, monospace';
+      ctx.fillText('[ 开发者模式 ]', 560, 14);
+    }
 
     // 物品栏（底部）
     const invY = VIEW_H - 28;
@@ -2220,14 +2252,14 @@
       const def = ITEMS[t];
       ctx.fillStyle = '#1a1a24';
       ctx.fillRect(xi, invY + 4, 24, 20);
-      ctx.fillStyle = (t === 'ammo' && n > 0) ? '#ffe070' : def.color;
+      ctx.fillStyle = (t === 'ammo' && (n > 0 || devMode)) ? '#ffe070' : def.color;
       ctx.fillRect(xi + 2, invY + 6, 8, 8);
       ctx.fillStyle = PAL.ui;
       ctx.font = '8px Consolas, monospace';
       ctx.fillText(def.name, xi + 12, invY + 12);
       ctx.fillStyle = PAL.ui;
       ctx.font = '10px Consolas, monospace';
-      ctx.fillText('x' + n, xi + 2, invY + 20);
+      ctx.fillText(devMode ? '∞' : ('x' + n), xi + 2, invY + 20);
       // 快捷键（子弹格显示 K，其它显示数字）
       ctx.fillStyle = PAL.uiDim;
       ctx.font = '8px Consolas, monospace';
@@ -2296,6 +2328,22 @@
 
   function toastMsg(text, ms) {
     toast = { text, until: performance.now() + ms };
+  }
+
+  // ---------- 开发者模式 ----------
+  function toggleDevMode() {
+    devMode = !devMode;
+    if (devMode) {
+      // 开启：补满血量，物品视为无限（不实际改 inv，使用时不消耗）
+      game.player.hp = game.player.maxHp;
+      toastMsg('开发者模式已开启', 1800);
+    } else {
+      // 关闭：物品清零（包括子弹），血量保留但不超过上限
+      game.player.inv = {};
+      game.player.ammo = 0;
+      if (game.player.hp > game.player.maxHp) game.player.hp = game.player.maxHp;
+      toastMsg('开发者模式已关闭，物品已清零', 1800);
+    }
   }
 
   // ---------- 菜单 ----------
@@ -2635,17 +2683,21 @@
   }
 
   // ---------- 暂停 ----------
+  const PAUSE_RESUME = { x: VIEW_W/2 - 80, y: VIEW_H/2 + 14, w: 160, h: 38, label: '返回游戏' };
   function renderPause() {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.fillStyle = PAL.ui;
     ctx.font = 'bold 24px Microsoft YaHei, Consolas, monospace';
+    ctx.textBaseline = 'alphabetic';
     ctx.fillText('暂停', VIEW_W/2 - 30, VIEW_H/2 - 30);
+    // 返回游戏按钮
+    drawBigButton(PAUSE_RESUME, hitBtn(PAUSE_RESUME, mousePos.x, mousePos.y));
     ctx.font = '12px Consolas, monospace';
     ctx.fillStyle = PAL.uiDim;
     const coop = game && game.netMode && game.netMode !== 'single';
-    if (coop) ctx.fillText('ESC 继续    M 离开派对并返回主菜单', VIEW_W/2 - 130, VIEW_H/2 + 4);
-    else ctx.fillText('ESC 继续    R 保存    M 返回主菜单', VIEW_W/2 - 110, VIEW_H/2 + 4);
+    if (coop) ctx.fillText('M 离开派对并返回主菜单', VIEW_W/2 - 110, VIEW_H/2 + 70);
+    else ctx.fillText('R 保存    M 返回主菜单', VIEW_W/2 - 90, VIEW_H/2 + 70);
   }
 
   function pauseInput() {
@@ -2729,6 +2781,8 @@
       if (hitBtn(LOBBY_LEAVE, x, y)) { leaveParty(); state = 'MENU'; return; }
     } else if (state === 'CLIENT_LOBBY') {
       if (hitBtn(LOBBY_LEAVE, x, y)) { leaveParty(); state = 'MENU'; return; }
+    } else if (state === 'PAUSED') {
+      if (hitBtn(PAUSE_RESUME, x, y)) { state = 'PLAYING'; return; }
     } else if (state === 'DEAD') {
       // 死亡：联机下先离开派对
       if (party.role) leaveParty();
@@ -2762,10 +2816,17 @@
     }
 
     render();
+    keyPressed = {};   // 每帧清空单次按键，避免暂停/恢复时同一按键跨帧重复触发
     requestAnimationFrame(loop);
   }
   // 启动时订阅派对事件
   attachPartyEvents();
+  // 订阅主进程的 F12 开发者模式切换
+  if (window.api && window.api.onDevToggle) {
+    window.api.onDevToggle(() => {
+      if (state === 'PLAYING' && game && game.netMode === 'single') toggleDevMode();
+    });
+  }
   requestAnimationFrame(loop);
 
 })();
